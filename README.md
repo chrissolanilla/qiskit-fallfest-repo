@@ -4,6 +4,10 @@ This is a hackathon hosted at UCF sponsored by IBM for qiskit fallfest 2026.
 
 The goal is to take 3 different QPUs and test out 3 different noise scenarios.
 
+[Three processor models](assets/threeQPUs.png)
+
+[Challenge Table](assets/table.png)
+
 ## How to run
 
 ### Clone the repo
