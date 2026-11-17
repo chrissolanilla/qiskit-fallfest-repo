@@ -5,7 +5,13 @@ import questionary
 from questionary import Style
 from questionary.prompts import common
 
-OPTIONS = ("5 qubit", "contemporary", "hyperbolic")
+from coupling_graphs.graphs import models
+
+OPTIONS = {
+    "5 qubit": "2016-inspired reference",
+    "contemporary": "Contemporary IBM-style",
+    "hyperbolic": "Hyperbolic-inspired model",
+}
 
 common.INDICATOR_SELECTED = "[x]"
 common.INDICATOR_UNSELECTED = "[ ]"
@@ -69,19 +75,39 @@ def main():
     # i want incoperate always on and spectator noise, and we derive this with the hamiltonian and pauli twirling?
     # maybe we do not need pauli twirling since the qubit count is so low and we can get the optimal circuit
 
-    noise = []
-    noisy_result = []
-    protected_result = []
-    i=0
     for qpu in selected:
-        circuit = optimal_brute_force_transpile(qpu)
-        noise =+ analyze_noise() #maybe get noise is better name?
-        noisy_result[i] = get_noisy_result(noise)
-        protected_result[i] = get_protected_result(circuit, noise) # maybe just pass in noisy_result?
+        model = models[OPTIONS[qpu]]
+        circuit = optimal_brute_force_transpile(model)
+        #first case: ideal, no noise
+        ideal_result = run_ideal(circuit, model["ports"])
 
-    for result in results:
-        print("Results:")
-        #print the results i guess maybe in a table form or something
+        #second case: our own noisy baseline of injected crosstalk
+        crosstalk = get_crosstalk(model, circuit)
+        noisy_result = run_noisy(
+            circuit,
+            baseline_noise,
+            crosstalk,
+        )
+
+        # third case: injected crosstalk noise AND protection method
+        protected_circuit = protect_circuit(
+            circuit,
+            model,
+        )
+        protected_result = run_noisy(
+            protected_circuit,
+            baseline_noise,
+            get_crosstalk(model, protected_circuit),
+        )
+
+        results.append({
+            "qpu": qpu,
+            "ideal": ideal_result,
+            "noisy": noisy_result,
+            "protected": protected_result,
+        })
+
+    print_results(results)
 
 if __name__ == "__main__":
     main()
