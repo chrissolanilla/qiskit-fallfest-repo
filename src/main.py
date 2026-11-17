@@ -6,6 +6,7 @@ from questionary import Style
 from questionary.prompts import common
 
 from coupling_graphs.graphs import models
+from circuits.routing import optimal_brute_force_transpile
 
 OPTIONS = {
     "5 qubit": "2016-inspired reference",
