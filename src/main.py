@@ -7,6 +7,8 @@ from questionary.prompts import common
 
 from coupling_graphs.graphs import models
 from circuits.routing import optimal_brute_force_transpile
+from analysis.metrics import run_ideal
+from noise.cross_talk import inject
 
 OPTIONS = {
     "5 qubit": "2016-inspired reference",
@@ -83,12 +85,27 @@ def main():
         ideal_result = run_ideal(circuit, model["ports"])
 
         #second case: our own noisy baseline of injected crosstalk
-        crosstalk = get_crosstalk(model, circuit)
-        noisy_result = run_noisy(
-            circuit,
-            baseline_noise,
-            crosstalk,
+        # crosstalk = get_crosstalk(model, circuit)
+        # noisy_result = run_noisy(
+        #     circuit,
+        #     baseline_noise,
+        #     crosstalk,
+        # )
+        # Always-on only
+        always_on = noise.inject(
+            circuit, model["edges"], channel="always_on"
         )
+
+        # Spectator only
+        spectator = noise.inject(
+            circuit, model["edges"], channel="spectator"
+        )
+
+        # Both mechanisms
+        combined = noise.inject(
+            circuit, model["edges"], channel="both"
+        )
+        noisy_result = run_noisy(circuit=combined) # should i separate the funcitn into the multiple parameters of circuit, always on, spectator noise, combined?
 
         # third case: injected crosstalk noise AND protection method
         protected_circuit = protect_circuit(
