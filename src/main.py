@@ -7,8 +7,8 @@ from questionary.prompts import common
 
 from coupling_graphs.graphs import models
 from circuits.routing import optimal_brute_force_transpile
-from analysis.metrics import run_ideal
-from noise.cross_talk import inject
+from analysis.metrics import run_ideal, run_noisy
+from noise.cross_talk import CrosstalkNoise
 
 OPTIONS = {
     "5 qubit": "2016-inspired reference",
@@ -78,11 +78,22 @@ def main():
     # i want incoperate always on and spectator noise, and we derive this with the hamiltonian and pauli twirling?
     # maybe we do not need pauli twirling since the qubit count is so low and we can get the optimal circuit
 
+    noise = CrosstalkNoise(
+        zeta_hz=50_000,
+        duration_s=1.3e-6,
+        spectator_zeta_hz=50_000,
+        spectator_duration_s=70e-9,
+        mechanism="pure_rzz",
+    )
+
+    results = []
     for qpu in selected:
         model = models[OPTIONS[qpu]]
         circuit = optimal_brute_force_transpile(model)
+        ports = model["ports"]
+        edges = model["edges"]
         #first case: ideal, no noise
-        ideal_result = run_ideal(circuit, model["ports"])
+        ideal_result = run_ideal(circuit, ports)
 
         #second case: our own noisy baseline of injected crosstalk
         # crosstalk = get_crosstalk(model, circuit)
@@ -91,21 +102,24 @@ def main():
         #     baseline_noise,
         #     crosstalk,
         # )
+        # i SHOULD probably just remove botha nd just get combined? idk separation of data couldnt hurt
         # Always-on only
         always_on = noise.inject(
-            circuit, model["edges"], channel="always_on"
+            circuit, edges, channel="always_on"
         )
+        always_on_result = run_noisy(always_on, ports)
 
         # Spectator only
         spectator = noise.inject(
-            circuit, model["edges"], channel="spectator"
+            circuit, edges, channel="spectator"
         )
+        spectator_result = run_noisy(spectator, ports)
 
         # Both mechanisms
         combined = noise.inject(
-            circuit, model["edges"], channel="both"
+            circuit, edges, channel="both"
         )
-        noisy_result = run_noisy(circuit=combined) # should i separate the funcitn into the multiple parameters of circuit, always on, spectator noise, combined?
+        combined_result = run_noisy(combined, ports)
 
         # third case: injected crosstalk noise AND protection method
         protected_circuit = protect_circuit(
@@ -121,7 +135,9 @@ def main():
         results.append({
             "qpu": qpu,
             "ideal": ideal_result,
-            "noisy": noisy_result,
+            "always_on": always_on_result,
+            "spectator": spectator_result,
+            "combined": combined_result,
             "protected": protected_result,
         })
 
